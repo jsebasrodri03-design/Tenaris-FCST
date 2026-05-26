@@ -168,12 +168,23 @@ if uploaded_file:
         st.success("El modelo fue validado mediante backtesting sobre los últimos 12 meses, superando a Holt-Winters (16%), Naive (20%) y SARIMA (25%).")
 
     else:
-        if uploaded_file.name.endswith('.xlsx'):
-            df_raw = pd.read_excel(uploaded_file, header=2)
-        else:
-            df_raw = pd.read_csv(uploaded_file)
+        try:
+            if uploaded_file.name.endswith('.xlsx'):
+                df_raw = pd.read_excel(uploaded_file)
+            else:
+                # Try different encodings and separators
+                try:
+                    df_raw = pd.read_csv(uploaded_file, encoding='utf-8', sep=None, engine='python')
+                except:
+                    uploaded_file.seek(0)
+                    df_raw = pd.read_csv(uploaded_file, encoding='latin1', sep=None, engine='python')
+        except Exception as e:
+            st.error(f"Error leyendo el archivo: {e}")
+            st.stop()
 
         df_raw.columns = df_raw.columns.str.strip()
+        st.write("Columnas detectadas:", list(df_raw.columns))
+        
         fecha_col  = next((c for c in df_raw.columns if "month" in c.lower()), None)
         ventas_col = next((c for c in df_raw.columns if "ton" in c.lower()), None)
 
