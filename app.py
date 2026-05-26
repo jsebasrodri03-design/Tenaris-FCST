@@ -67,9 +67,9 @@ if uploaded_file:
         st.subheader("📈 Forecast validado – Modelo Prophet")
 
         # MÉTRICAS
-        total = df['Escenario_Base'].sum()
-        low   = df['Escenario_Bajo'].sum()
-        high  = df['Escenario_Alto'].sum()
+        total = df['yhat'].sum()
+        low   = df['yhat_lower'].sum()
+        high  = df['yhat_upper'].sum()
 
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Demanda esperada 2026", f"{round(total):,} tons")
@@ -83,9 +83,9 @@ if uploaded_file:
         st.subheader("Proyección mensual 2026")
 
         fig, ax = plt.subplots(figsize=(12, 5))
-        ax.plot(df['ds'], df['Escenario_Base'], marker='o', linewidth=2,
+        ax.plot(df['ds'], df['yhat'], marker='o', linewidth=2,
                 color='#003f7f', label='Escenario base')
-        ax.fill_between(df['ds'], df['Escenario_Bajo'], df['Escenario_Alto'],
+        ax.fill_between(df['ds'], df['yhat_lower'], df['yhat_upper'],
                         alpha=0.15, color='#003f7f', label='Rango de incertidumbre')
         ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f'{int(x):,}'))
         ax.set_xlabel("Mes")
@@ -219,7 +219,7 @@ else:
     ### 👆 Sube un archivo para comenzar
 
     **Modo 1 – Forecast validado:** sube el archivo `forecast_2026.csv` con las columnas
-    `ds`, `Escenario_Base`, `Escenario_Bajo`, `Escenario_Alto`.
+    `ds`, `yhat`, `yhat_lower`, `yhat_upper`.
 
     **Modo 2 – Nuevo forecast:** sube el histórico de ventas en Excel (.xlsx)
     con columnas de fecha (`month`) y volumen (`tons`).
