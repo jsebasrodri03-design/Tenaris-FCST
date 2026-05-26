@@ -3,3 +3,4 @@ pandas
 prophet
 matplotlib
 openpyxl
+statsmodels
