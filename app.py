@@ -110,10 +110,10 @@ if uploaded_file:
             df_bt['ds'] = pd.to_datetime(df_bt['ds'])
 
             fig2, ax2 = plt.subplots(figsize=(12, 5))
-            if 'y' in df_bt.columns:
-                ax2.plot(df_bt['ds'], df_bt['y'], color='black', linewidth=2, marker='o', label='Real')
-            if 'yhat' in df_bt.columns:
-                ax2.plot(df_bt['ds'], df_bt['yhat'], color='#003f7f', linewidth=2, label='Prophet')
+            if 'y_real' in df_bt.columns:
+                ax2.plot(df_bt['ds'], df_bt['y_real'], color='black', linewidth=2, marker='o', label='Real')
+            if 'yhat_prophet' in df_bt.columns:
+                ax2.plot(df_bt['ds'], df_bt['yhat_prophet'], color='#003f7f', linewidth=2, label='Prophet')
             if 'yhat_naive' in df_bt.columns:
                 ax2.plot(df_bt['ds'], df_bt['yhat_naive'], color='orange', linewidth=1.5, linestyle='--', label='Naive')
             ax2.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f'{int(x):,}'))
