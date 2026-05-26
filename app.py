@@ -175,7 +175,7 @@ else:
                 df_raw = pd.read_excel(uploaded_file)
             else:
                 try:
-                    df_raw = pd.read_csv(uploaded_file, encoding='utf-8', sep=None, engine='python')
+                    df_raw = pd.read_csv(uploaded_file, encoding='utf-8-sig', sep=None, engine='python')
                 except Exception:
                     uploaded_file.seek(0)
                     df_raw = pd.read_csv(uploaded_file, encoding='latin1', sep=None, engine='python')
@@ -183,7 +183,7 @@ else:
             st.error(f"Error leyendo el archivo: {e}")
             st.stop()
 
-        df_raw.columns = df_raw.columns.str.strip()
+        df_raw.columns = df_raw.columns.str.strip().str.replace('\ufeff', '', regex=False)
 
         # ── PASO 2: LIMPIAR Y PREPARAR ────────────────────────────────────────
         MONTH = 'Month'
