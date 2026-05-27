@@ -255,12 +255,13 @@ else:
         high  = fc_12['yhat_upper'].sum()
 
         # ── TABS ──────────────────────────────────────────────────────────────
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
             "📈 Forecast Total",
             "🏭 Por Familia",
             "📅 Estacionalidad",
             "📊 Componentes",
-            "🏆 Comparación Modelos"
+            "🏆 Comparación Modelos",
+            "📉 Análisis Histórico"
         ])
 
         # ── TAB 1: FORECAST TOTAL ─────────────────────────────────────────────
@@ -551,6 +552,95 @@ else:
             st.pyplot(fig_c)
 
             st.info(f"Prophet mejora al Naive en **{round(mape_naive - mape_prophet, 1)} puntos porcentuales** de MAPE.")
+
+        # ── TAB 6: ANÁLISIS HISTÓRICO ─────────────────────────────────────────
+        with tab6:
+            st.subheader("📉 Análisis histórico de ventas")
+
+            PRICE = 'Suma de Precio (US$/Tn)'
+            GM    = 'Suma de GM (US$/Tn)'
+
+            # Gráfico 1: Monthly Tons Sold
+            st.markdown("**Comportamiento histórico de ventas mensuales**")
+            fig_h1, ax_h1 = plt.subplots(figsize=(12, 4))
+            ax_h1.plot(df_prophet['ds'], df_prophet['y'], color='#003f7f', linewidth=2, marker='o', markersize=4)
+            ax_h1.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f'{int(x):,}'))
+            ax_h1.set_xlabel("Mes"); ax_h1.set_ylabel("Toneladas")
+            ax_h1.set_title("Monthly Tons Sold – Tenaris S.A.", fontsize=13)
+            ax_h1.grid(True, alpha=0.3)
+            plt.xticks(rotation=45); plt.tight_layout()
+            st.pyplot(fig_h1)
+
+            st.markdown("---")
+
+            # Gráfico 2: Tons + Precio + GM (doble eje Y)
+            if PRICE in df_clean.columns and GM in df_clean.columns:
+                st.markdown("**Relación entre Toneladas, Precio y Margen Bruto**")
+
+                df_clean[PRICE] = df_clean[PRICE].apply(clean_numeric)
+                df_clean[GM]    = df_clean[GM].apply(clean_numeric)
+                df_clean['Month'] = pd.to_datetime(df_clean['Month'], errors='coerce', dayfirst=True)
+
+                ts_precio = df_clean.groupby('Month')[PRICE].mean().sort_index()
+                ts_gm     = df_clean.groupby('Month')[GM].mean().sort_index()
+                ts_tons   = df_prophet.set_index('ds')['y']
+
+                fig_h2, ax1 = plt.subplots(figsize=(12, 5))
+                ax2_r = ax1.twinx()
+
+                ax1.plot(ts_tons.index, ts_tons.values, color='#003f7f', linewidth=2, label='Tons vendidas')
+                ax1.set_ylabel("Toneladas", color='#003f7f')
+                ax1.tick_params(axis='y', labelcolor='#003f7f')
+                ax1.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f'{int(x):,}'))
+
+                ax2_r.plot(ts_precio.index, ts_precio.values, color='#c62828', linewidth=1.5, linestyle='--', label='Precio (US$/Tn)')
+                ax2_r.plot(ts_gm.index, ts_gm.values, color='#2e7d32', linewidth=1.5, linestyle=':', label='GM (US$/Tn)')
+                ax2_r.set_ylabel("US$/Tn", color='gray')
+                ax2_r.tick_params(axis='y', labelcolor='gray')
+
+                lines1, labels1 = ax1.get_legend_handles_labels()
+                lines2, labels2 = ax2_r.get_legend_handles_labels()
+                ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper right')
+
+                ax1.set_title("Tons vendidas vs Precio vs Margen Bruto", fontsize=13)
+                ax1.set_xlabel("Mes")
+                ax1.grid(True, alpha=0.3)
+                plt.xticks(rotation=45); plt.tight_layout()
+                st.pyplot(fig_h2)
+
+                st.markdown("---")
+
+                # Correlaciones
+                st.markdown("**Correlación entre variables**")
+                df_corr = pd.DataFrame({
+                    'Tons': ts_tons,
+                    'Precio (US$/Tn)': ts_precio,
+                    'GM (US$/Tn)': ts_gm
+                }).dropna()
+
+                corr = df_corr.corr().round(3)
+                st.dataframe(corr.style.background_gradient(cmap='RdYlGn', vmin=-1, vmax=1),
+                             use_container_width=True)
+
+                # Interpretación automática
+                corr_tons_precio = corr.loc['Tons', 'Precio (US$/Tn)']
+                corr_tons_gm     = corr.loc['Tons', 'GM (US$/Tn)']
+
+                st.markdown("**Interpretación:**")
+                if abs(corr_tons_precio) > 0.5:
+                    direccion = "positiva" if corr_tons_precio > 0 else "negativa"
+                    st.write(f"- Existe una correlación **{direccion} moderada-alta ({corr_tons_precio})** entre las toneladas vendidas y el precio unitario.")
+                else:
+                    st.write(f"- La correlación entre toneladas y precio es **baja ({corr_tons_precio})**, lo que sugiere que el volumen no depende directamente del precio en este período.")
+
+                if abs(corr_tons_gm) > 0.5:
+                    direccion = "positiva" if corr_tons_gm > 0 else "negativa"
+                    st.write(f"- Existe una correlación **{direccion} moderada-alta ({corr_tons_gm})** entre las toneladas vendidas y el margen bruto.")
+                else:
+                    st.write(f"- La correlación entre toneladas y margen bruto es **baja ({corr_tons_gm})**.")
+
+            else:
+                st.info("El archivo no contiene las columnas de Precio y GM necesarias para este análisis.")
 
     else:
         st.markdown("""
