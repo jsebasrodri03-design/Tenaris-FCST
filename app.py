@@ -664,8 +664,8 @@ else:
                 axes[0].plot(x0, p0(x0), color='black', linewidth=1.5, linestyle='--')
                 axes[0].set_xlabel("Precio (US$/Tn)")
                 axes[0].set_ylabel("Toneladas")
-                axes[0].set_title(f"Tons vs Precio
-r = {corr.loc['Tons','Precio (US$/Tn)']:.3f}")
+                r0 = corr.loc['Tons','Precio (US$/Tn)']
+                axes[0].set_title(f"Tons vs Precio  |  r = {r0:.3f}")
                 axes[0].yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f'{int(x):,}'))
                 axes[0].grid(True, alpha=0.3)
 
@@ -678,8 +678,8 @@ r = {corr.loc['Tons','Precio (US$/Tn)']:.3f}")
                 axes[1].plot(x1, p1(x1), color='black', linewidth=1.5, linestyle='--')
                 axes[1].set_xlabel("GM (US$/Tn)")
                 axes[1].set_ylabel("Toneladas")
-                axes[1].set_title(f"Tons vs GM
-r = {corr.loc['Tons','GM (US$/Tn)']:.3f}")
+                r1 = corr.loc['Tons','GM (US$/Tn)']
+                axes[1].set_title(f"Tons vs GM  |  r = {r1:.3f}")
                 axes[1].yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f'{int(x):,}'))
                 axes[1].grid(True, alpha=0.3)
 
@@ -692,8 +692,8 @@ r = {corr.loc['Tons','GM (US$/Tn)']:.3f}")
                 axes[2].plot(x2, p2(x2), color='black', linewidth=1.5, linestyle='--')
                 axes[2].set_xlabel("Precio (US$/Tn)")
                 axes[2].set_ylabel("GM (US$/Tn)")
-                axes[2].set_title(f"Precio vs GM
-r = {corr.loc['Precio (US$/Tn)','GM (US$/Tn)']:.3f}")
+                r2 = corr.loc['Precio (US$/Tn)','GM (US$/Tn)']
+                axes[2].set_title(f"Precio vs GM  |  r = {r2:.3f}")
                 axes[2].grid(True, alpha=0.3)
 
                 plt.tight_layout()
