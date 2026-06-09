@@ -13,22 +13,147 @@ st.set_page_config(
     layout="wide"
 )
 
-# ── HEADER ────────────────────────────────────────────────────────────────────
-col_logo, col_title = st.columns([1, 4])
-with col_logo:
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Tenaris_logo.svg/320px-Tenaris_logo.svg.png", width=180)
-with col_title:
-    st.markdown("## Dashboard de Proyección de Demanda")
-    st.markdown("**Tenaris S.A. – Business Coordination**")
-
-st.divider()
+# ── CSS STYLING ──────────────────────────────────────────────────────────────
 st.markdown("""
-Este dashboard permite visualizar el forecast validado del modelo de pronóstico de ventas
-y generar nuevas proyecciones con datos actualizados.
+<style>
+    /* Main background */
+    .stApp { background-color: #f8f9fb; }
+    
+    /* Header bar */
+    .tenaris-header {
+        background: linear-gradient(135deg, #003f7f 0%, #0066cc 100%);
+        padding: 20px 30px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+        color: white;
+    }
+    .tenaris-header h1 {
+        color: white !important;
+        font-size: 28px !important;
+        font-weight: 700 !important;
+        margin: 0 !important;
+    }
+    .tenaris-header p {
+        color: rgba(255,255,255,0.85) !important;
+        font-size: 15px !important;
+        margin: 4px 0 0 0 !important;
+    }
 
-> 📊 El modelo seleccionado (Prophet) presenta un error promedio (**MAPE ≈ 11%**),
-> con cobertura de intervalos del **91.7%** y sesgo de **-5.3%**.
-""")
+    /* Metric cards */
+    [data-testid="metric-container"] {
+        background: white;
+        border: 1px solid #e0e6f0;
+        border-radius: 10px;
+        padding: 16px 20px;
+        box-shadow: 0 2px 8px rgba(0,63,127,0.08);
+    }
+    [data-testid="metric-container"] label {
+        color: #5a7a9a !important;
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    [data-testid="metric-container"] [data-testid="stMetricValue"] {
+        color: #003f7f !important;
+        font-size: 28px !important;
+        font-weight: 700 !important;
+    }
+
+    /* Tabs styling */
+    .stTabs [data-baseweb="tab-list"] {
+        background: white;
+        border-radius: 10px;
+        padding: 4px;
+        box-shadow: 0 2px 8px rgba(0,63,127,0.08);
+        border: 1px solid #e0e6f0;
+    }
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 8px;
+        color: #5a7a9a;
+        font-weight: 600;
+        font-size: 13px;
+    }
+    .stTabs [aria-selected="true"] {
+        background: #003f7f !important;
+        color: white !important;
+    }
+
+    /* Dataframe */
+    [data-testid="stDataFrame"] {
+        border-radius: 10px;
+        border: 1px solid #e0e6f0;
+        box-shadow: 0 2px 8px rgba(0,63,127,0.06);
+    }
+
+    /* Info/Warning/Success boxes */
+    [data-testid="stAlert"] {
+        border-radius: 10px;
+        border-left-width: 4px;
+    }
+
+    /* Section headers */
+    h2, h3 {
+        color: #003f7f !important;
+        font-weight: 700 !important;
+    }
+
+    /* Divider */
+    hr { border-color: #e0e6f0; }
+
+    /* Sidebar */
+    .css-1d391kg { background: white; }
+
+    /* Upload button */
+    [data-testid="stFileUploader"] {
+        background: white;
+        border-radius: 10px;
+        border: 2px dashed #003f7f;
+        padding: 10px;
+    }
+
+    /* Download button */
+    [data-testid="stDownloadButton"] button {
+        background: #003f7f !important;
+        color: white !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+        border: none !important;
+        padding: 10px 20px !important;
+    }
+    [data-testid="stDownloadButton"] button:hover {
+        background: #0066cc !important;
+    }
+
+    /* Radio buttons */
+    [data-testid="stRadio"] label {
+        font-weight: 600;
+        color: #003f7f;
+    }
+
+    /* Slider */
+    [data-testid="stSlider"] {
+        padding: 10px 0;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ── HEADER ────────────────────────────────────────────────────────────────────
+st.markdown("""
+<div class="tenaris-header">
+    <h1>📊 Dashboard de Proyección de Demanda</h1>
+    <p>Tenaris S.A. &nbsp;·&nbsp; Business Coordination &nbsp;·&nbsp; Modelo Prophet | MAPE ≈ 11% | Cobertura 91.7% | Sesgo -5.3%</p>
+</div>
+""", unsafe_allow_html=True)
+
+col_logo, col_info = st.columns([1, 4])
+with col_logo:
+    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Tenaris_logo.svg/320px-Tenaris_logo.svg.png", width=160)
+with col_info:
+    st.markdown("""
+    Este dashboard permite visualizar el forecast validado y generar nuevas proyecciones con datos actualizados.
+    Selecciona el modo de uso para comenzar.
+    """)
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
 def clean_numeric(s):
