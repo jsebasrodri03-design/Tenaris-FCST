@@ -148,7 +148,7 @@ st.markdown("""
 
 col_logo, col_info = st.columns([1, 4])
 with col_logo:
-    st.image("https://www.tenaris.com/static/media/logo-tenaris.png", width=160)
+    st.image("logo.png", width=160)
 with col_info:
     st.markdown("""
     Este dashboard permite visualizar el forecast validado y generar nuevas proyecciones con datos actualizados.
