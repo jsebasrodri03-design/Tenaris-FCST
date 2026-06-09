@@ -81,7 +81,8 @@ def train_prophet(df_prophet, cps=0.02):
         yearly_seasonality=True,
         weekly_seasonality=False,
         daily_seasonality=False,
-        changepoint_prior_scale=cps
+        changepoint_prior_scale=cps,
+        interval_width=0.60
     )
     m.fit(df_prophet)
     return m
