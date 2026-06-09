@@ -230,6 +230,33 @@ else:
 
         st.success(f"✅ Serie lista: **{len(df_prophet)} meses** | Rango: {df_prophet['ds'].min().strftime('%Y-%m')} → {df_prophet['ds'].max().strftime('%Y-%m')}")
 
+        # ── FILTRO DE FECHA ───────────────────────────────────────────────────
+        st.markdown("**🗓️ Filtro de rango de fechas para el modelo**")
+        fecha_min = df_prophet['ds'].min().to_pydatetime()
+        fecha_max = df_prophet['ds'].max().to_pydatetime()
+
+        col_f1, col_f2 = st.columns(2)
+        with col_f1:
+            fecha_inicio = st.date_input("Desde:", value=fecha_min, min_value=fecha_min, max_value=fecha_max)
+        with col_f2:
+            fecha_fin = st.date_input("Hasta:", value=fecha_max, min_value=fecha_min, max_value=fecha_max)
+
+        fecha_inicio = pd.Timestamp(fecha_inicio)
+        fecha_fin    = pd.Timestamp(fecha_fin)
+
+        df_prophet = df_prophet[(df_prophet['ds'] >= fecha_inicio) & (df_prophet['ds'] <= fecha_fin)].reset_index(drop=True)
+
+        if len(df_prophet) < 12:
+            st.error("⚠️ El rango seleccionado tiene menos de 12 meses. Amplía el rango para obtener un forecast confiable.")
+            st.stop()
+
+        st.info(f"📅 Entrenando con **{len(df_prophet)} meses** ({fecha_inicio.strftime('%Y-%m')} → {fecha_fin.strftime('%Y-%m')})")
+
+        # ── UMBRAL DE ALERTA ──────────────────────────────────────────────────
+        umbral_alerta = st.slider("⚠️ Umbral de alerta por desviación (%):", min_value=10, max_value=60, value=30, step=5)
+
+        st.markdown("---")
+
         # ── GRID SEARCH CPS ───────────────────────────────────────────────────
         with st.spinner("🔄 Entrenando modelo Prophet y buscando mejores parámetros..."):
             M = 12
@@ -290,12 +317,37 @@ else:
 
             st.markdown("---")
             st.subheader("🚦 Semáforo mensual")
-            fc_sem = semaforo_df(fc_12)
+
+            prom_hist = df_prophet['y'].mean()
+
+            fc_sem = fc_12.copy()
             fc_sem['Mes'] = fc_sem['ds'].dt.strftime('%B %Y')
-            sem = fc_sem[['Mes','yhat','Estado']].copy()
-            sem.columns = ['Mes','Pronóstico (tons)','Estado']
+            fc_sem['Desviación vs hist (%)'] = ((fc_sem['yhat'] - prom_hist) / prom_hist * 100).round(1)
+            fc_sem['Estado'] = fc_sem['yhat'].apply(
+                lambda x: '🟢 Alto' if x > prom_hist * 1.05
+                else ('🔴 Bajo' if x < prom_hist * 0.95 else '🟡 Normal')
+            )
+
+            sem = fc_sem[['Mes','yhat','Desviación vs hist (%)','Estado']].copy()
+            sem.columns = ['Mes','Pronóstico (tons)','Desviación vs histórico (%)','Estado']
             sem['Pronóstico (tons)'] = sem['Pronóstico (tons)'].apply(lambda x: f"{round(x):,}")
             st.dataframe(sem, use_container_width=True, hide_index=True)
+
+            # ── ALERTAS DE DESVIACIÓN ─────────────────────────────────────────
+            alertas = fc_sem[abs(fc_sem['Desviación vs hist (%)']) > umbral_alerta]
+            if not alertas.empty:
+                st.markdown("---")
+                st.subheader("🚨 Alertas de desviación")
+                for _, row in alertas.iterrows():
+                    direccion = "por encima" if row['Desviación vs hist (%)'] > 0 else "por debajo"
+                    color = "🟢" if row['Desviación vs hist (%)'] > 0 else "🔴"
+                    st.warning(
+                        f"{color} **{row['Mes']}** — Pronóstico: **{round(row['yhat']):,} tons** | "
+                        f"Desviación: **{abs(row['Desviación vs hist (%)'])}% {direccion}** del promedio histórico ({round(prom_hist):,} tons). "
+                        f"Se recomienda verificar con el área comercial."
+                    )
+            else:
+                st.success(f"✅ Ningún mes supera el umbral de alerta del {umbral_alerta}%.")
 
             st.markdown("---")
             fig, ax = plt.subplots(figsize=(12, 5))
