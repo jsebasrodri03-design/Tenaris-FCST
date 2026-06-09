@@ -334,8 +334,8 @@ else:
                 df_clean[MONTH] = pd.to_datetime(df_clean[MONTH], errors='coerce', dayfirst=True)
                 df_clean[TONS]  = df_clean[TONS].apply(clean_numeric)
 
-                familias = sorted(df_clean[FAMILY].dropna().unique())
-                familia_sel = st.multiselect("Selecciona familias:", familias, default=familias[:3] if len(familias) >= 3 else familias)
+                familias = sorted([f for f in df_clean[FAMILY].dropna().unique() if '2' not in str(f) and 'DOWNGRAD' not in str(f).upper()])
+                familia_sel = st.multiselect("Selecciona familias:", familias, default=familias)
 
                 res_familias = []
 
@@ -582,8 +582,17 @@ else:
                 df_clean[GM]    = df_clean[GM].apply(clean_numeric)
                 df_clean['Month'] = pd.to_datetime(df_clean['Month'], errors='coerce', dayfirst=True)
 
-                ts_precio = df_clean.groupby('Month')[PRICE].mean().sort_index()
-                ts_gm     = df_clean.groupby('Month')[GM].mean().sort_index()
+                # Precio y GM ponderados por tonelada (US$/Tn real)
+                def weighted_avg(group, val_col, weight_col):
+                    d = group[[val_col, weight_col]].dropna()
+                    if d[weight_col].sum() == 0:
+                        return np.nan
+                    return (d[val_col] * d[weight_col]).sum() / d[weight_col].sum()
+
+                ts_precio = df_clean.groupby('Month').apply(
+                    lambda g: weighted_avg(g, PRICE, TONS)).sort_index()
+                ts_gm = df_clean.groupby('Month').apply(
+                    lambda g: weighted_avg(g, GM, TONS)).sort_index()
                 ts_tons   = df_prophet.set_index('ds')['y']
 
                 fig_h2, ax1 = plt.subplots(figsize=(12, 5))
@@ -611,8 +620,9 @@ else:
 
                 st.markdown("---")
 
-                # Correlaciones
+                # ── CORRELACIONES ────────────────────────────────────────────────
                 st.markdown("**Correlación entre variables**")
+
                 df_corr = pd.DataFrame({
                     'Tons': ts_tons,
                     'Precio (US$/Tn)': ts_precio,
@@ -620,25 +630,98 @@ else:
                 }).dropna()
 
                 corr = df_corr.corr().round(3)
-                st.dataframe(corr.style.background_gradient(cmap='RdYlGn', vmin=-1, vmax=1),
-                             use_container_width=True)
 
-                # Interpretación automática
-                corr_tons_precio = corr.loc['Tons', 'Precio (US$/Tn)']
-                corr_tons_gm     = corr.loc['Tons', 'GM (US$/Tn)']
+                # Heatmap de correlación
+                fig_corr, ax_corr = plt.subplots(figsize=(6, 4))
+                im = ax_corr.imshow(corr.values, cmap='RdYlGn', vmin=-1, vmax=1, aspect='auto')
+                plt.colorbar(im, ax=ax_corr)
+                ax_corr.set_xticks(range(len(corr.columns)))
+                ax_corr.set_yticks(range(len(corr.columns)))
+                ax_corr.set_xticklabels(corr.columns, rotation=15, ha='right')
+                ax_corr.set_yticklabels(corr.columns)
+                for i in range(len(corr)):
+                    for j in range(len(corr.columns)):
+                        ax_corr.text(j, i, f"{corr.values[i,j]:.3f}",
+                                    ha='center', va='center', fontsize=12, fontweight='bold',
+                                    color='black')
+                ax_corr.set_title("Matriz de correlación", fontsize=12)
+                plt.tight_layout()
+                st.pyplot(fig_corr)
 
+                st.markdown("---")
+
+                # ── SCATTER PLOTS ─────────────────────────────────────────────
+                st.markdown("**Diagramas de dispersión**")
+
+                fig_sc, axes = plt.subplots(1, 3, figsize=(14, 4))
+
+                # Tons vs Precio
+                axes[0].scatter(df_corr['Precio (US$/Tn)'], df_corr['Tons'],
+                               color='#c62828', alpha=0.7, edgecolors='white', s=60)
+                z0 = np.polyfit(df_corr['Precio (US$/Tn)'].dropna(), df_corr['Tons'].dropna(), 1)
+                p0 = np.poly1d(z0)
+                x0 = np.linspace(df_corr['Precio (US$/Tn)'].min(), df_corr['Precio (US$/Tn)'].max(), 100)
+                axes[0].plot(x0, p0(x0), color='black', linewidth=1.5, linestyle='--')
+                axes[0].set_xlabel("Precio (US$/Tn)")
+                axes[0].set_ylabel("Toneladas")
+                axes[0].set_title(f"Tons vs Precio
+r = {corr.loc['Tons','Precio (US$/Tn)']:.3f}")
+                axes[0].yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f'{int(x):,}'))
+                axes[0].grid(True, alpha=0.3)
+
+                # Tons vs GM
+                axes[1].scatter(df_corr['GM (US$/Tn)'], df_corr['Tons'],
+                               color='#2e7d32', alpha=0.7, edgecolors='white', s=60)
+                z1 = np.polyfit(df_corr['GM (US$/Tn)'].dropna(), df_corr['Tons'].dropna(), 1)
+                p1 = np.poly1d(z1)
+                x1 = np.linspace(df_corr['GM (US$/Tn)'].min(), df_corr['GM (US$/Tn)'].max(), 100)
+                axes[1].plot(x1, p1(x1), color='black', linewidth=1.5, linestyle='--')
+                axes[1].set_xlabel("GM (US$/Tn)")
+                axes[1].set_ylabel("Toneladas")
+                axes[1].set_title(f"Tons vs GM
+r = {corr.loc['Tons','GM (US$/Tn)']:.3f}")
+                axes[1].yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f'{int(x):,}'))
+                axes[1].grid(True, alpha=0.3)
+
+                # Precio vs GM
+                axes[2].scatter(df_corr['Precio (US$/Tn)'], df_corr['GM (US$/Tn)'],
+                               color='#003f7f', alpha=0.7, edgecolors='white', s=60)
+                z2 = np.polyfit(df_corr['Precio (US$/Tn)'].dropna(), df_corr['GM (US$/Tn)'].dropna(), 1)
+                p2 = np.poly1d(z2)
+                x2 = np.linspace(df_corr['Precio (US$/Tn)'].min(), df_corr['Precio (US$/Tn)'].max(), 100)
+                axes[2].plot(x2, p2(x2), color='black', linewidth=1.5, linestyle='--')
+                axes[2].set_xlabel("Precio (US$/Tn)")
+                axes[2].set_ylabel("GM (US$/Tn)")
+                axes[2].set_title(f"Precio vs GM
+r = {corr.loc['Precio (US$/Tn)','GM (US$/Tn)']:.3f}")
+                axes[2].grid(True, alpha=0.3)
+
+                plt.tight_layout()
+                st.pyplot(fig_sc)
+
+                st.markdown("---")
+
+                # ── INTERPRETACIÓN ────────────────────────────────────────────
                 st.markdown("**Interpretación:**")
-                if abs(corr_tons_precio) > 0.5:
-                    direccion = "positiva" if corr_tons_precio > 0 else "negativa"
-                    st.write(f"- Existe una correlación **{direccion} moderada-alta ({corr_tons_precio})** entre las toneladas vendidas y el precio unitario.")
-                else:
-                    st.write(f"- La correlación entre toneladas y precio es **baja ({corr_tons_precio})**, lo que sugiere que el volumen no depende directamente del precio en este período.")
 
-                if abs(corr_tons_gm) > 0.5:
-                    direccion = "positiva" if corr_tons_gm > 0 else "negativa"
-                    st.write(f"- Existe una correlación **{direccion} moderada-alta ({corr_tons_gm})** entre las toneladas vendidas y el margen bruto.")
-                else:
-                    st.write(f"- La correlación entre toneladas y margen bruto es **baja ({corr_tons_gm})**.")
+                def interpretar(r, var1, var2):
+                    if abs(r) >= 0.7:
+                        fuerza = "fuerte"
+                    elif abs(r) >= 0.4:
+                        fuerza = "moderada"
+                    else:
+                        fuerza = "baja"
+                    direccion = "positiva" if r > 0 else "negativa"
+                    return f"- **{var1} vs {var2}:** correlación {direccion} {fuerza} (r = {r:.3f})"
+
+                st.markdown(interpretar(corr.loc['Tons','Precio (US$/Tn)'], 'Toneladas', 'Precio'))
+                st.markdown(interpretar(corr.loc['Tons','GM (US$/Tn)'], 'Toneladas', 'Margen Bruto'))
+                st.markdown(interpretar(corr.loc['Precio (US$/Tn)','GM (US$/Tn)'], 'Precio', 'Margen Bruto'))
+
+                # Nota especial si Precio-GM es muy alta
+                r_precio_gm = corr.loc['Precio (US$/Tn)','GM (US$/Tn)']
+                if abs(r_precio_gm) >= 0.8:
+                    st.info(f"💡 La correlación entre Precio y GM es muy alta ({r_precio_gm:.3f}), lo que indica que el margen bruto de Tenaris está fuertemente ligado al precio de venta por tonelada.")
 
             else:
                 st.info("El archivo no contiene las columnas de Precio y GM necesarias para este análisis.")
