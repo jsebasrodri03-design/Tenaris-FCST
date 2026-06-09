@@ -139,21 +139,18 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ── HEADER ────────────────────────────────────────────────────────────────────
-st.markdown("""
-<div class="tenaris-header">
-    <h1>📊 Dashboard de Proyección de Demanda</h1>
-    <p>Tenaris S.A. &nbsp;·&nbsp; Business Coordination &nbsp;·&nbsp; Modelo Prophet | MAPE ≈ 11% | Cobertura 91.7% | Sesgo -5.3%</p>
-</div>
-""", unsafe_allow_html=True)
-
-col_logo, col_info = st.columns([1, 4])
+col_logo, col_title = st.columns([1, 5])
 with col_logo:
     st.image("logo.png", width=160)
-with col_info:
+with col_title:
     st.markdown("""
-    Este dashboard permite visualizar el forecast validado y generar nuevas proyecciones con datos actualizados.
-    Selecciona el modo de uso para comenzar.
-    """)
+    <div class="tenaris-header">
+        <h1>Dashboard de Proyección de Demanda</h1>
+        <p>Tenaris S.A. &nbsp;·&nbsp; Business Coordination &nbsp;·&nbsp; Modelo Prophet | MAPE ≈ 11% | Cobertura 91.7% | Sesgo -5.3%</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+st.markdown("Este dashboard permite visualizar el forecast validado y generar nuevas proyecciones con datos actualizados. Selecciona el modo de uso para comenzar.")
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
 def clean_numeric(s):
