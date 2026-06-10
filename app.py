@@ -343,6 +343,7 @@ else:
         MONTH = 'Month'
         TONS  = 'Suma de Tons'
         FAMILY = 'Prod Family'
+        COUNTRY = 'End Customer Country'
 
         if MONTH not in df_raw.columns or TONS not in df_raw.columns:
             st.error(f"No se encontraron las columnas '{MONTH}' y '{TONS}'. Columnas disponibles: {list(df_raw.columns)}")
@@ -405,9 +406,10 @@ else:
         high  = fc_12['yhat_upper'].sum()
 
         # ── TABS ──────────────────────────────────────────────────────────────
-        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        tab1, tab2, tab2b, tab3, tab4, tab5, tab6 = st.tabs([
             "📈 Forecast Total",
             "🏭 Por Familia",
+            "🌎 Por País",
             "📅 Estacionalidad",
             "📊 Componentes",
             "🏆 Comparación Modelos",
@@ -566,6 +568,94 @@ else:
                     buffer.seek(0)
                     st.download_button("📥 Descargar resumen por familia", buffer,
                                        "Forecast_Familias.xlsx",
+                                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+        # ── TAB 2B: FORECAST POR PAÍS ─────────────────────────────────────────
+        with tab2b:
+            st.subheader("🌎 Forecast por país del cliente")
+
+            if COUNTRY not in df_clean.columns:
+                st.warning(f"No se encontró la columna '{COUNTRY}' en el archivo.")
+            else:
+                df_clean[MONTH] = pd.to_datetime(df_clean[MONTH], errors='coerce', dayfirst=True)
+                df_clean[TONS]  = df_clean[TONS].apply(clean_numeric)
+
+                # Ordenar países por volumen total (mayor a menor)
+                vol_pais = (df_clean.groupby(COUNTRY)[TONS].sum()
+                            .sort_values(ascending=False))
+                paises = [p for p in vol_pais.index if pd.notna(p) and str(p).strip() != '']
+
+                # Por defecto seleccionar el top 5 para no saturar
+                default_paises = paises[:5]
+                pais_sel = st.multiselect("Selecciona países:", paises, default=default_paises)
+
+                res_paises = []
+
+                with st.spinner("Calculando forecast por país..."):
+                    for pais in pais_sel:
+                        sub = (df_clean[df_clean[COUNTRY] == pais]
+                               .groupby(MONTH)[TONS].sum()
+                               .sort_index()
+                               .reset_index())
+                        sub.columns = ['ds', 'y']
+                        sub = sub.dropna()
+
+                        if sub['y'].sum() == 0 or len(sub) < 6:
+                            st.info(f"⏩ {pais}: histórico insuficiente (<6 meses), se omite.")
+                            continue
+
+                        try:
+                            m_pais = train_prophet(sub, best_cps)
+                            fc_pais = m_pais.predict(m_pais.make_future_dataframe(periods=M, freq='MS'))
+                            fc_pais_12 = fc_pais.tail(M)
+
+                            yhat_bt = fc_pais.set_index('ds')['yhat'].reindex(sub.set_index('ds').iloc[-M:].index)
+                            mape_pais = mape_safe(sub['y'].iloc[-M:].values, yhat_bt.values)
+
+                            res_paises.append({
+                                'País': pais,
+                                'Forecast 12m (tons)': round(fc_pais_12['yhat'].sum()),
+                                'MAPE': round(mape_pais, 1) if not np.isnan(mape_pais) else 'N/A',
+                                'Meses histórico': len(sub)
+                            })
+
+                            # Gráfico por país
+                            fig_p, ax_p = plt.subplots(figsize=(10, 3))
+                            ax_p.plot(sub['ds'], sub['y'], color='gray', linewidth=1.2, label='Histórico')
+                            ax_p.plot(fc_pais['ds'], fc_pais['yhat'], color='#003f7f', linewidth=2, label='Forecast')
+                            ax_p.fill_between(fc_pais['ds'], fc_pais['yhat_lower'], fc_pais['yhat_upper'], alpha=0.15, color='#003f7f')
+                            ax_p.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f'{int(x):,}'))
+                            ax_p.set_title(f"{pais} — Forecast 12m: {round(fc_pais_12['yhat'].sum()):,} tons | MAPE: {round(mape_pais,1) if not np.isnan(mape_pais) else 'N/A'}%", fontsize=11)
+                            ax_p.legend(); ax_p.grid(True, alpha=0.3)
+                            plt.xticks(rotation=45); plt.tight_layout()
+                            st.pyplot(fig_p)
+
+                        except Exception as e:
+                            st.warning(f"No se pudo calcular forecast para {pais}: {e}")
+
+                if res_paises:
+                    st.markdown("---")
+                    st.subheader("Resumen por país")
+                    df_resp = pd.DataFrame(res_paises).sort_values('Forecast 12m (tons)', ascending=False)
+                    st.dataframe(df_resp, use_container_width=True, hide_index=True)
+
+                    # Gráfico de participación (barras)
+                    st.markdown("**Participación en el forecast 12m**")
+                    fig_pp, ax_pp = plt.subplots(figsize=(10, 4))
+                    df_plot = df_resp.sort_values('Forecast 12m (tons)', ascending=True)
+                    ax_pp.barh(df_plot['País'].astype(str), df_plot['Forecast 12m (tons)'], color='#003f7f', alpha=0.85)
+                    ax_pp.xaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f'{int(x):,}'))
+                    ax_pp.set_xlabel("Toneladas proyectadas (12m)")
+                    ax_pp.grid(True, alpha=0.3, axis='x')
+                    plt.tight_layout()
+                    st.pyplot(fig_pp)
+
+                    buffer = io.BytesIO()
+                    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                        df_resp.to_excel(writer, index=False, sheet_name='Paises')
+                    buffer.seek(0)
+                    st.download_button("📥 Descargar resumen por país", buffer,
+                                       "Forecast_Paises.xlsx",
                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
         # ── TAB 3: ESTACIONALIDAD ─────────────────────────────────────────────
